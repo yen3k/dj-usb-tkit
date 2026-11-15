@@ -32,9 +32,12 @@ by it:
   ticked format the app makes (AIFF, WAV or MP3). The progress bar shows "Converting" first. The
   new transcode stays in the library like one made with Convert…, so the next export reuses it.
   An out-of-date transcode is made again the same way.
-- An MP3 or AAC track in a format the USB doesn't allow can't be converted (the app only converts
+- An MP3 or AAC track in a format the USB doesn't allow can't be converted (export only converts
   from lossless). The export is refused before anything is written, and the message names the
   tracks.
+- An OGG track goes as its up-to-date transcode in the first ticked format. Export doesn't make
+  one: an OGG track without such a transcode is left off the USB with a warning, as players
+  don't play OGG (see [USB_EXPORT.md](USB_EXPORT.md)). Convert it first.
 - A file already on the USB is never removed by the export (only a mirror export prunes, as
   rekordbox's does). A track exported as its FLAC before and as its MP3 now is on the USB both
   ways: two USB tracks, each with its own masterContentId, both in the playlist.
@@ -69,8 +72,9 @@ size.
 
 The app decides, so selecting a mixed set is fine:
 
-- Only lossless files are converted: FLAC, ALAC (`.m4a` files holding ALAC,
-  not AAC), WAV and AIFF.
+- Only lossless files and OGG Vorbis are converted: FLAC, ALAC (`.m4a` files
+  holding ALAC, not AAC), WAV, AIFF and OGG. Players can't play OGG, so its
+  transcode is how an OGG track gets on a USB.
 - A file already in the chosen format is skipped (a WAV is not converted to
   WAV).
 - A track that already has an up-to-date transcode in that format is skipped.

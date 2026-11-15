@@ -245,11 +245,7 @@ fn choose_export_file(
     up_to_date: &[TranscodeFile],
     formats: &UsbAudioFormats,
 ) -> ExportFile {
-    // Not a USB audio formats format: export's own "players don't play it"
-    // rule deals with it.
-    let Some(own) = library_usb_audio_format(&track.file_path, track.bit_depth) else {
-        return ExportFile::Source;
-    };
+    let own = library_usb_audio_format(&track.file_path, track.bit_depth);
     let ticked = || {
         formats
             .entries()
@@ -258,7 +254,7 @@ fn choose_export_file(
             .map(|&(format, _)| format)
     };
     for format in ticked() {
-        if format == own {
+        if Some(format) == own {
             return ExportFile::Source;
         }
         if let Some(file) = up_to_date
@@ -268,6 +264,11 @@ fn choose_export_file(
             return ExportFile::Transcode(file.clone());
         }
     }
+    // Not a USB audio formats format: export's own "players don't play it"
+    // rule deals with it.
+    let Some(own) = own else {
+        return ExportFile::Source;
+    };
     if !is_lossless(own) {
         return ExportFile::Refused(own);
     }
@@ -652,6 +653,25 @@ mod tests {
         assert_eq!(
             plan(&fx, &tracks[1..2], &only_alac)[0],
             ExportFile::Refused(UsbAudioFormat::Flac)
+        );
+    }
+
+    #[test]
+    fn an_ogg_goes_as_its_transcode_or_is_left_to_the_unplayable_rule() {
+        let fx = fixture(&[("ogg", "mp3", 100)]);
+        let tracks = [
+            track("ogg", "/m/x.ogg", None),
+            track("bare", "/m/y.ogg", None),
+        ];
+        let got = plan(&fx, &tracks, &UsbAudioFormats::default());
+        let ExportFile::Transcode(file) = &got[0] else {
+            panic!("{:?}", got[0]);
+        };
+        assert_eq!(file.file_path, fx.paths["ogg"]);
+        assert_eq!(got[1], ExportFile::Source);
+        assert_eq!(
+            plan(&fx, &tracks[..1], &no(&["mp3"]))[0],
+            ExportFile::Source
         );
     }
 

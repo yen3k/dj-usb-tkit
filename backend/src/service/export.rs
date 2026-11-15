@@ -529,12 +529,22 @@ fn track_on_usb(
 /// `playlist` and returns them: export leaves them off the USB rather than
 /// put a track in the databases that won't play. Unlike a missing source file
 /// this skip is deliberate, so it doesn't hold back a mirror export's prune.
-fn split_off_unplayable_tracks(playlist: &mut ExportPlaylistData) -> Vec<ExportTrackData> {
-    let (playable, unplayable) = std::mem::take(&mut playlist.tracks)
+fn split_off_unplayable_tracks(
+    conn: &rusqlite::Connection,
+    playlist: &mut ExportPlaylistData,
+    formats: &super::usb_identity::UsbAudioFormats,
+    facts: SourceFacts,
+) -> BackendResult<Vec<ExportTrackData>> {
+    let plan = plan_export_files(conn, &playlist.tracks, formats, facts)?;
+    let (playable, unplayable): (Vec<_>, Vec<_>) = std::mem::take(&mut playlist.tracks)
         .into_iter()
-        .partition(|track| is_player_extension(&export_extension(Path::new(&track.file_path))));
-    playlist.tracks = playable;
-    unplayable
+        .zip(plan)
+        .partition(|(track, file)| {
+            matches!(file, ExportFile::Transcode(_))
+                || is_player_extension(&export_extension(Path::new(&track.file_path)))
+        });
+    playlist.tracks = playable.into_iter().map(|(track, _)| track).collect();
+    Ok(unplayable.into_iter().map(|(track, _)| track).collect())
 }
 
 /// The playlist heading's export estimate, from recorded data only: each
@@ -1254,7 +1264,7 @@ impl BackendService {
             let disabled_reason = if data.tracks.is_empty() {
                 Some(tr::batch_export_reason_empty())
             } else {
-                split_off_unplayable_tracks(&mut data);
+                split_off_unplayable_tracks(&conn, &mut data, &formats, SourceFacts::Recorded)?;
                 if data.tracks.is_empty() {
                     Some(tr::batch_export_reason_none_playable())
                 } else if !super::export_blocking_missing_source_roots(
@@ -1321,13 +1331,10 @@ impl BackendService {
             .collect::<BackendResult<Vec<_>>>()?;
         let mut playlist = merged_export_playlist(&loaded);
         let list_track_count = playlist.tracks.len();
-        split_off_unplayable_tracks(&mut playlist);
-        let plan = plan_export_files(
-            &*self.db.connect()?,
-            &playlist.tracks,
-            &super::usb_identity::read_usb_audio_formats(usb_root),
-            SourceFacts::Recorded,
-        )?;
+        let conn = self.db.connect()?;
+        let formats = super::usb_identity::read_usb_audio_formats(usb_root);
+        split_off_unplayable_tracks(&conn, &mut playlist, &formats, SourceFacts::Recorded)?;
+        let plan = plan_export_files(&conn, &playlist.tracks, &formats, SourceFacts::Recorded)?;
         // Sized as the files export will copy: a transcode by its own size,
         // one still to make by an estimate.
         let mut convert = Vec::new();
@@ -1595,12 +1602,18 @@ impl BackendService {
             })
             .unwrap_or(false);
         let mut runs = Vec::<PlaylistRun>::with_capacity(playlist_ids.len());
+        let formats = super::usb_identity::read_usb_audio_formats(&usb_root);
         for playlist_id in playlist_ids {
             let mut playlist = self.load_playlist_for_export(playlist_id)?;
             if playlist.tracks.is_empty() {
                 return Err(BackendError::Validation(tr::export_error_no_tracks()));
             }
-            let unplayable_tracks = split_off_unplayable_tracks(&mut playlist);
+            let unplayable_tracks = split_off_unplayable_tracks(
+                &*self.db.connect()?,
+                &mut playlist,
+                &formats,
+                SourceFacts::OnDisk,
+            )?;
             if playlist.tracks.is_empty() {
                 return Err(BackendError::Validation(tr::export_error_none_playable()));
             }
