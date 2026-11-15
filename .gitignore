@@ -13,3 +13,5 @@ desktop/src-tauri/gen/schemas/windows-schema.json
 .docker-cache/
 .tmp-diag-data/
 .cargo/
+
+,noread
