@@ -31,6 +31,9 @@
           webkitgtk_4_1
           alsa-lib
         ];
+        shellHook = ''
+          export XDG_DATA_DIRS="${pkgs.glib.getSchemaDataDirPath pkgs.gtk3}:${pkgs.glib.getSchemaDataDirPath pkgs.gsettings-desktop-schemas}:$XDG_DATA_DIRS"
+        '';
     };
   };
 }
