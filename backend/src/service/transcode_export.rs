@@ -19,7 +19,9 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, params, params_from_iter};
 
 use crate::audio_encode::TranscodeFormat;
-use crate::audio_format::{UsbAudioFormat, format_ext_from_path, track_rekordbox_file_type};
+use crate::audio_format::{
+    AudioFormat, UsbAudioFormat, format_ext_from_path, track_rekordbox_file_type,
+};
 use crate::edb::ExportTrackData;
 use crate::error::BackendResult;
 use crate::i18n::tr;
@@ -264,10 +266,15 @@ fn choose_export_file(
             return ExportFile::Transcode(file.clone());
         }
     }
-    // Not a USB audio formats format: export's own "players don't play it"
-    // rule deals with it.
+    // Not a USB audio formats format: an OGG gets a transcode made, anything
+    // else is left to export's own "players don't play it" rule.
     let Some(own) = own else {
-        return ExportFile::Source;
+        return match AudioFormat::of_path(Path::new(&track.file_path)) {
+            Some(AudioFormat::Ogg) => ticked()
+                .find_map(transcode_format_of)
+                .map_or(ExportFile::Source, ExportFile::Make),
+            _ => ExportFile::Source,
+        };
     };
     if !is_lossless(own) {
         return ExportFile::Refused(own);
@@ -657,7 +664,7 @@ mod tests {
     }
 
     #[test]
-    fn an_ogg_goes_as_its_transcode_or_is_left_to_the_unplayable_rule() {
+    fn an_ogg_goes_as_its_transcode_or_gets_one_made() {
         let fx = fixture(&[("ogg", "mp3", 100)]);
         let tracks = [
             track("ogg", "/m/x.ogg", None),
@@ -668,9 +675,13 @@ mod tests {
             panic!("{:?}", got[0]);
         };
         assert_eq!(file.file_path, fx.paths["ogg"]);
-        assert_eq!(got[1], ExportFile::Source);
+        assert_eq!(got[1], ExportFile::Make(TranscodeFormat::Aiff));
         assert_eq!(
             plan(&fx, &tracks[..1], &no(&["mp3"]))[0],
+            ExportFile::Make(TranscodeFormat::Aiff)
+        );
+        assert_eq!(
+            plan(&fx, &tracks[1..], &no(&["aiff", "wav", "mp3"]))[0],
             ExportFile::Source
         );
     }

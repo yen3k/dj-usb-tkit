@@ -525,11 +525,11 @@ fn track_on_usb(
     })
 }
 
-/// Takes the tracks players don't play (`.opus`, `.m4p`, and `.ogg` without a
-/// transcode the USB takes) out of `playlist` and returns them: export leaves
-/// them off the USB rather than put a track in the databases that won't play.
-/// Unlike a missing source file this skip is deliberate, so it doesn't hold
-/// back a mirror export's prune.
+/// Takes the tracks players don't play (`.opus`, `.m4p`, and `.ogg` when the
+/// USB takes no format the app converts to) out of `playlist` and returns
+/// them: export leaves them off the USB rather than put a track in the
+/// databases that won't play. Unlike a missing source file this skip is
+/// deliberate, so it doesn't hold back a mirror export's prune.
 fn split_off_unplayable_tracks(
     conn: &rusqlite::Connection,
     playlist: &mut ExportPlaylistData,
@@ -541,7 +541,7 @@ fn split_off_unplayable_tracks(
         .into_iter()
         .zip(plan)
         .partition(|(track, file)| {
-            matches!(file, ExportFile::Transcode(_))
+            matches!(file, ExportFile::Transcode(_) | ExportFile::Make(_))
                 || is_player_extension(&export_extension(Path::new(&track.file_path)))
         });
     playlist.tracks = playable.into_iter().map(|(track, _)| track).collect();
