@@ -447,27 +447,17 @@ impl Coordinator {
                 &self.job_id,
                 build_started_progress(self.completed, self.total, &item.track),
             );
-            if has_memory {
-                self.in_flight += 1;
-                logging::debug(
-                    "analysis",
-                    format!(
-                        "dispatch: track={} engine={engine:?} in_flight={} queued={}",
-                        item.track.id,
-                        self.in_flight,
-                        self.queue.len(),
-                    ),
-                );
-                self.spawn_worker(item);
-            } else {
-                self.finish_track(
-                    item,
-                    Err(BackendError::Internal(format!(
-                        "Not enough available memory to start analysis right now (needs ~{} MB free). Wait for other analysis to finish and try again.",
-                        super::analysis_bytes_per_worker(engine) / (1024 * 1024)
-                    ))),
-                );
-            }
+            self.in_flight += 1;
+            logging::debug(
+                "analysis",
+                format!(
+                    "dispatch: track={} engine={engine:?} in_flight={} queued={}",
+                    item.track.id,
+                    self.in_flight,
+                    self.queue.len(),
+                ),
+            );
+            self.spawn_worker(item);
         }
     }
 
@@ -518,6 +508,10 @@ impl Coordinator {
                     panic_text(payload.as_ref())
                 )))
             });
+            #[cfg(all(target_os = "linux", target_env = "gnu"))]
+            unsafe {
+                libc::malloc_trim(0);
+            }
             let _ = tx.send(Message::WorkerDone { item, result });
         });
     }
