@@ -42,6 +42,9 @@
 - **New feature:** Convert… makes AIFF, WAV or MP3 transcodes of OGG Vorbis tracks too. Players don't play OGG, so
   export puts an OGG track on the USB as its transcode, with the track's cues, beat grid and BPM, and converts one
   that has none the way it converts lossless tracks, in the USB's first ticked audio format the app makes.
+- **Improvement:** Import from Mixxx (↻) always takes Mixxx's BPM, key, first beat and cues, even over edits made
+  in the app, as Force update does. A track without cues in Mixxx loses its cues in the app, also with Force update.
+  The next export writes the changes to the USB, without analyzing the tracks again.
 - **Fix:** Analysis no longer fails every track still waiting with "Not enough available memory" when the last
   running track ends. The next track starts anyway, and memory freed by a finished track goes back to the system.
 

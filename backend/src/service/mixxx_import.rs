@@ -572,7 +572,8 @@ fn load_mixxx_playlist_entries(
 struct MixxxTrackImporter<'a> {
     mixxx: &'a Connection,
     /// Take BPM, key and cues from Mixxx even over the app's own values
-    /// (the playlist import's "force update").
+    /// (the playlist import's "force update", and always the whole-library
+    /// import).
     force: bool,
     has_cues_table: bool,
     existing: HashMap<String, String>,
@@ -779,6 +780,8 @@ impl<'a> MixxxTrackImporter<'a> {
     }
 
     /// Hot cues: only onto a track without local cues (local edits win).
+    /// Forced, Mixxx's replace them, and a track without any in Mixxx loses
+    /// its cues.
     fn import_cues(
         &mut self,
         tx: &Connection,
@@ -789,16 +792,16 @@ impl<'a> MixxxTrackImporter<'a> {
             return Ok(());
         };
         let cues = mixxx_cues_to_track_cues(&load_mixxx_cues(self.mixxx, t.mixxx_id)?, sample_rate);
-        if cues.is_empty() {
-            return Ok(());
-        }
         if self.force {
             tx.execute(
                 "DELETE FROM track_cues WHERE track_id = ?1",
                 params![track_id],
             )?;
-        } else if track_has_cues(tx, track_id)? {
+        } else if !cues.is_empty() && track_has_cues(tx, track_id)? {
             self.cue_tracks_kept_local += 1;
+            return Ok(());
+        }
+        if cues.is_empty() {
             return Ok(());
         }
         insert_track_cues(tx, track_id, &cues)?;
@@ -874,6 +877,7 @@ impl BackendService {
         let mut db_conn = self.db.connect()?;
         let tx = db_conn.transaction()?;
         let mut importer = MixxxTrackImporter::new(&mixxx, &tx, &self.db.data_dir())?;
+        importer.force = true;
         for t in &tracks {
             importer.upsert(&tx, t)?;
         }
@@ -1402,7 +1406,7 @@ mod tests {
         assert_eq!(analysis[0].kept_first_beat_ms, Some(500));
         assert_eq!(analysis[1].kept_first_beat_ms, None);
 
-        // A grid moved in Mixxx comes across; one moved in the app is kept.
+        // A grid moved in Mixxx comes across, even over one moved in the app.
         set_grid(1, "BeatGrid-2.0", proto_beat_grid(124.0, 33_075));
         set_grid(2, "BeatMap-1.0", proto_beat_map(&[(88_200, None)]));
         conn()
@@ -1414,6 +1418,6 @@ mod tests {
             .expect("move first beat");
         scan();
         assert_eq!(beat("Grid"), (Some(750), Some("mixxx".to_string())));
-        assert_eq!(beat("Map"), (Some(900), Some("user".to_string())));
+        assert_eq!(beat("Map"), (Some(2000), Some("mixxx".to_string())));
     }
 }

@@ -1058,7 +1058,7 @@ fn import_mixxx(
 }
 
 #[test]
-fn scan_mixxx_db_imports_tracks_cues_and_cover_and_keeps_local_cues() {
+fn scan_mixxx_db_imports_tracks_cues_and_cover_and_takes_mixxx_values_over_local_ones() {
     let mixxx_root = tempdir().expect("mixxx root");
     let media_root = tempdir().expect("media root");
     let (_app_dir, data_dir, backend) = app();
@@ -1204,7 +1204,6 @@ fn scan_mixxx_db_imports_tracks_cues_and_cover_and_keeps_local_cues() {
     let codes: Vec<_> = result.warnings.iter().map(|w| w.code.as_str()).collect();
     for code in [
         "scan.mixxx-db.cues-imported",
-        "scan.mixxx-db.cues-kept-local",
         "scan.mixxx-db.unsupported-skipped",
     ] {
         assert!(codes.contains(&code), "expected {code}, got {codes:?}");
@@ -1273,7 +1272,7 @@ fn scan_mixxx_db_imports_tracks_cues_and_cover_and_keeps_local_cues() {
         ]
     );
 
-    // Existing track: metadata refreshed, local analysis + cues kept.
+    // Existing track: Mixxx's BPM, key and cues replace the app's.
     let (bpm, key, mixxx_flag): (Option<f64>, Option<String>, i64) = db
         .query_row(
             "SELECT bpm, tonality, mixxx_db_source FROM tracks WHERE id = 'existing-track'",
@@ -1281,11 +1280,9 @@ fn scan_mixxx_db_imports_tracks_cues_and_cover_and_keeps_local_cues() {
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )
         .expect("existing row");
-    assert_eq!(bpm, Some(128.0));
+    assert_eq!(bpm, Some(124.0));
     assert_eq!(key.as_deref(), Some("C"));
     assert_eq!(mixxx_flag, 1);
-    // Only the value this import filled in (the key) is marked Mixxx's;
-    // the BPM the track already had keeps its (empty) source.
     let sources: (Option<String>, Option<String>) = db
         .query_row(
             "SELECT bpm_analyzer, tonality_source FROM tracks WHERE id = 'existing-track'",
@@ -1293,15 +1290,18 @@ fn scan_mixxx_db_imports_tracks_cues_and_cover_and_keeps_local_cues() {
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .expect("existing track sources");
-    assert_eq!(sources, (None, Some("mixxx".to_string())));
-    let existing_cues: Vec<String> = db
-        .prepare("SELECT id FROM track_cues WHERE track_id = 'existing-track'")
+    assert_eq!(
+        sources,
+        (Some("mixxx".to_string()), Some("mixxx".to_string()))
+    );
+    let existing_cues: Vec<i64> = db
+        .prepare("SELECT position_ms FROM track_cues WHERE track_id = 'existing-track'")
         .unwrap()
         .query_map([], |r| r.get(0))
         .unwrap()
         .collect::<Result<_, _>>()
         .unwrap();
-    assert_eq!(existing_cues, vec!["local-cue".to_string()]);
+    assert_eq!(existing_cues, vec![1_000]);
 
     // The missing file's track is kept, with its cue and playlist place.
     let kept: (i64, i64, i64) = db
@@ -1611,6 +1611,13 @@ fn reimporting_a_mixxx_playlist_updates_it_and_refreshes_or_forces_track_data() 
         .expect("alpha cue");
     assert_eq!(alpha_cue, 1_000, "Mixxx's cue replaced the local one");
     assert_eq!(playlist_count(&data_dir), 2);
+
+    Connection::open(&mixxx_path)
+        .expect("open mixxx fixture")
+        .execute("DELETE FROM cues WHERE track_id = 2", [])
+        .expect("mixxx cues deleted");
+    import(ExternalPlaylistKind::Playlist, true);
+    assert_eq!(track("Bravo").2, 0, "Mixxx has no cues left for it");
 }
 
 #[test]

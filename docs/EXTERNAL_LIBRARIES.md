@@ -61,6 +61,13 @@ win:
 The playlist import can override this per playlist (see **Force update**
 below).
 
+The Mixxx chip's ↻ is the exception: it always takes Mixxx's values, as
+**Force update** does, so Mixxx is the authority. BPM, key, the first beat and
+cues follow Mixxx even where you edited them or reanalyzed the track in the
+app, and a track without cues in Mixxx loses its cues in the app. Length,
+title, artist, album and genre follow the rules above. The tracks don't need
+analyzing again: the next export writes the new cues and beat grid to the USB.
+
 The app's cue list is up to 8 cue points plus one playback-start cue, and
 cue points take pads A–H in position order. So an imported hot cue can land on
 a different pad letter than in rekordbox or Mixxx if the pads weren't in
@@ -144,9 +151,9 @@ delete is created again on the next import.
 **Force update track data from rekordbox / Mixxx** (a checkbox, off by
 default) makes the ticked playlists' tracks take BPM, key and cues from their
 library even where you edited them or reanalyzed them in the app. Cues are only
-replaced when the library has cues for the track. The analysis files on the
-USB follow on the next export, which rebuilds each track's beat grid and cues
-from the app's values.
+replaced when rekordbox has cues for the track; a track without cues in Mixxx
+loses its cues in the app. The analysis files on the USB follow on the next
+export, which rebuilds each track's beat grid and cues from the app's values.
 
 ### When both libraries have the same file
 
