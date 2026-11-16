@@ -1,5 +1,5 @@
 //! In its own test binary, and so its own process: it reports almost no memory
-//! through the environment, which would fail any analysis running beside it.
+//! through the environment, which would hold back any analysis running beside it.
 
 mod library_sources;
 

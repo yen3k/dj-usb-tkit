@@ -271,8 +271,8 @@ pub struct TranscodeTracksData {
     #[serde(default)]
     pub job_id: String,
     pub transcoded: usize,
-    /// Tracks that need no transcode in this format (not lossless, already
-    /// this format, already up to date, file missing).
+    /// Tracks that need no transcode in this format (not lossless or OGG,
+    /// already this format, already up to date, file missing).
     pub skipped: usize,
     pub failed: usize,
     pub cancelled: bool,

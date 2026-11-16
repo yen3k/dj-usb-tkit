@@ -427,7 +427,7 @@ impl Coordinator {
             }
             let has_memory = has_memory_headroom_for_engine(engine);
             // Too little memory: wait for a running track to free some. With
-            // none running nothing will, so the track fails instead.
+            // none running nothing will, so the track starts anyway.
             if !has_memory && self.in_flight > 0 {
                 logging::debug(
                     "analysis",

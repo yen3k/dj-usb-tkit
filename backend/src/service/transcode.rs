@@ -139,7 +139,7 @@ pub(crate) fn file_facts(path: &Path) -> (Option<i64>, Option<i64>) {
     }
 }
 
-/// Whether `path` holds lossless audio a transcode can be made from.
+/// Whether `path` holds audio a transcode can be made from: lossless, or OGG Vorbis.
 fn is_transcode_source(path: &Path) -> bool {
     match AudioFormat::of_path(path) {
         Some(

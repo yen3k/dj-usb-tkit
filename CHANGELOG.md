@@ -39,6 +39,12 @@
 
 ## Unreleased
 
+- **New feature:** Convert… makes AIFF, WAV or MP3 transcodes of OGG Vorbis tracks too. Players don't play OGG, so
+  export puts an OGG track on the USB as its transcode, with the track's cues, beat grid and BPM. An OGG track
+  without one is still left off the USB with a warning.
+- **Fix:** Analysis no longer fails every track still waiting with "Not enough available memory" when the last
+  running track ends. The next track starts anyway, and memory freed by a finished track goes back to the system.
+
 ## 0.6.1
 
 **Severity:** feature
